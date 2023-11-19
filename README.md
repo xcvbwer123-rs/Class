@@ -115,3 +115,6 @@ print(L02L.Gender)
 
 print(tostring(L02L))
 ```
+
+## 대충 더 할말
+클래스만들때 정의 안한 변수 새로 넣어도 에러 안나요 :>
