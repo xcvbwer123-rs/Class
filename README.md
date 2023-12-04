@@ -90,7 +90,7 @@ local L02L = class.create({
     };
     
     makeAsUserdata = true;
-})
+}).new()
 
 -- 기능 테스트
 L02L:GetPropertyChangedSignal("Age"):Connect(function(newAge)
