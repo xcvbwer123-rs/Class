@@ -105,9 +105,9 @@ local function __index(object, key)
         valueToReturn = rawget(constructor, key)
     end
 
-    if not isMethod and not getfenv(2).__rawReturn and valueToReturn ~= nil and rawget(constructor.__getters, key) then
+    if not isMethod and not getfenv(2)[`__raw{key}Return`] and valueToReturn ~= nil and rawget(constructor.__getters, key) then
         local getter = rawget(constructor.__getters, key)
-        local env = setmetatable({__rawReturn = true}, {__index = getfenv(getter)})
+        local env = setmetatable({[`__raw{key}Return`] = true}, {__index = getfenv(getter)})
 
         valueToReturn = setfenv(getter, env)(object, valueToReturn)
     end
@@ -169,7 +169,7 @@ local function __newindex(object, key, newValue)
         end
 
         if rawget(constructor.__setters, key) then
-            if getfenv(2).__isInSetter then
+            if getfenv(2)[`__isIn{key}Setter`] then
                 local StackInfomation = traceback(2)
 
                 warn(exceptions.TRY_TO_SET_SAME_INDEX_IN_SETTER)
@@ -179,7 +179,7 @@ local function __newindex(object, key, newValue)
                 return
             else
                 local setter = rawget(constructor.__setters, key)
-                local env = setmetatable({__isInSetter = true}, {__index = getfenv(setter)})
+                local env = setmetatable({[`__isIn{key}Setter`] = true}, {__index = getfenv(setter)})
                 newValue = setfenv(setter, env)(object, newValue)
             end
         end
@@ -192,10 +192,13 @@ local function __newindex(object, key, newValue)
     end
 
     local oldValue = object[key] -- 이거는 메타테이블 일부로 호출 시킨거이빈다 :>
+    local rawOldValue = rawget(metatable.__self, key)
 
     rawset(metatable.__self, key, newValue)
 
-    if newValue ~= oldValue then
+    if newValue ~= rawOldValue then
+        local newValue = object[key] -- getter 통과시키게 일부로 이렇게 호출
+
         metatable.__modified:Fire(key, newValue, oldValue)
 
         if rawget(metatable.__propertyEvents, key) then
@@ -212,6 +215,14 @@ function class.create(arguments: createArguments)
     arguments.setters = arguments.setters or empty
     arguments.metamethods = arguments.metamethods or empty
     arguments.methods = arguments.methods or empty
+
+    for index, value in pairs(arguments.properties) do
+        if typeof(value) ~= "table" then
+            arguments.properties[index] = {
+                value = value
+            }
+        end
+    end
 
     constructor.__properties = arguments.properties
     constructor.__getters = arguments.getters
@@ -260,6 +271,12 @@ function class.super(baseConstructor: constructor, argumentsOverride: createArgu
     arguments.methods = arguments.methods or empty
 
     for index, value in pairs(arguments.properties) do
+        if typeof(value) ~= "table" then
+            value = {
+                value = value
+            }
+        end
+
         properties[index] = value
     end
     

@@ -40,81 +40,108 @@ create함수를 사용하면 클래스 생성자를 반환합니다. `생성자.
 :GetPropertyChangedSignal(propertyName: string) -> RBXScriptSignal | 로블록스 Instance의 GetPropertyChangedSignal메소드와 유사합니다. 값이 바뀌었을때 발동되는 시그널을 반환합니다. 이 시그널은 새 값, 예전값이 들어옵니다.
 ```
 
+## 클래스 상속
+`모듈.super`함수나 `생성자:super`메소드를 통해서 클래스를 상속시킬수 있습니다.
+
+필요한 인자들은 다음과 같습니다.
+
+#### 모듈.super
+```
+모듈.super(부모가 될 클래스, 덮어씌울 정보 테이블) -> 상속된 클래스
+```
+
+#### 생성자:super
+```
+생성자:super(덮어씌울 정보 테이블) -> 상속된 클래스
+```
+
 ## 예시
 ```lua
 local class = require(클래스 모듈 위치)
 
 -- 클래스 생성
-local L02L = class.create({
-    className = "L02_L";
+local myClass = class.create({
+    className = "myClass";
+
     properties = {
-        Age = {
+        Property1 = {
             value = 10;
         };
 
-        Job = {
-            value = "학생";
-        };
-        
-        Gender = {
-            value = "남자";
+        Property2 = {
+            value = true;
         };
     };
-    
+
     methods = {
         Jump = function(self)
             print("jumped")
         end;
     };
-    
+
     getters = {
-        Age = function(self, value: number)
-            print(("원래나이는 %s이지만 좀 추가해서 %s로 만들어줄께~~"):format(value, value + 40))
-            
+        Property1 = function(self, value: number)
             -- 내부에서 해당값을 호출해도 스텍 오버플로우가 생기지는 않습니다. 하지만 value와 같은값이 들어옵니다.
-            local CurrentAge = self.Age -- 그니까 굳이 하지 마세요.
+            local CurrentValue = self.Property1 -- 그니까 굳이 하지 마세요.
+
 
             return value + 40
+        end;
+
+        Property2 = function(self, value: boolean)
+            -- 있는값의 반대로 돌려줍니다.
+            return not value
         end;
     };
     
     setters = {
-        Gender = function(self, value: number)
-            print("성전환은 안돼!!")
-            return self.Gender
+        Property1 = function(self, value)
+            -- 이런식으로 setter 안에서 같은 인덱스를 수정하려고 하면 스텍 오버플로우를 피하기 위해 해당 라인이 무시됩니다.
+            self.Property1 = 10 -- 그리고 이 라인에서 경고를 띄웁니다.
+
+            -- 이렇게 인덱스가 다르면 수정할수 있습니다.
+            self.Property2 = false
+
+            return value
+        end;
+
+        Property2 = function(self, value)
+            -- 들어오는 새 변수를 반대로 저장합니다.
+            return not value
         end;
     };
-    
+
     metamethods = {
-        __tostring = function() return "김미믹" end;
+        __tostring = function() return "myClass" end;
     };
-    
-    makeAsUserdata = true;
-}).new()
+})
 
--- 기능 테스트
-L02L:GetPropertyChangedSignal("Age"):Connect(function(newAge)
-	print(`헐 나이먹었구나 어느세 {newAge}살 됬네??`)
-end)
+-- 오브젝트 생성
+local myObject = myClass.new()
 
-L02L.Changed:Connect(function(Property, New)
-	print(`{Property}값이 {New}로 바꼇어!!`)
-end)
+-- 변수 수정
+myObject.Property1 = 20
 
-print(L02L.Age, L02L.Job)
-
-L02L.Age = 19
-
-print(L02L.Age, L02L.Job)
-
-L02L:Jump()
-
-L02L.Gender = "여자"
-
-print(L02L.Gender)
-
-print(tostring(L02L))
 ```
 
 ## 대충 더 할말
 클래스만들때 정의 안한 변수 새로 넣어도 에러 안나요 :>
+
+```lua
+local myClass = 모듈.create({
+    className = "myClass";
+    properties = {
+        OriginalProperty = {
+            value = "Original"
+        }
+    };
+})
+
+local classObject = myClass.new()
+classObject.ExtraProperty = "Extra"
+
+print(`Original Property : {classObject.OriginalProperty}`)
+print(`Extra Property : {classObject.ExtraProperty}`)
+```
+
+이런식으로 말이죠!
