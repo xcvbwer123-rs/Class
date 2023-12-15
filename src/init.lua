@@ -34,7 +34,6 @@ export type createArguments = {
 export type property = {
     value: any;
     isReadOnly: boolean?;
-    locked: boolean?;
 }
 
 type constructor = {
