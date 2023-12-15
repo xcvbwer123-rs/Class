@@ -266,6 +266,8 @@ function class.super(baseConstructor: constructor, argumentsOverride: createArgu
     local constructor = {}
     local arguments = table.clone(argumentsOverride)
     local properties = table.clone(baseConstructor.__properties)
+    local getters = table.clone(baseConstructor.__getters)
+    local setters = table.clone(baseConstructor.__setters)
 
     arguments.metamethods = arguments.metamethods or empty
     arguments.methods = arguments.methods or empty
@@ -279,10 +281,18 @@ function class.super(baseConstructor: constructor, argumentsOverride: createArgu
 
         properties[index] = value
     end
+
+    for index, value in pairs(arguments.getters or empty) do
+        getters[index] = value
+    end
+
+    for index, value in pairs(arguments.setters or empty) do
+        setters[index] = value
+    end
     
     constructor.__properties = properties
-    constructor.__getters = arguments.getters or table.clone(baseConstructor.__getters)
-    constructor.__setters = arguments.setters or table.clone(baseConstructor.__setters)
+    constructor.__getters = getters
+    constructor.__setters = setters
     constructor.__createdScript = getfenv(2).script
     constructor.__index = arguments.metamethods.__index or baseConstructor.__index
     constructor.__newindex = arguments.metamethods.__newindex or baseConstructor.__newindex
