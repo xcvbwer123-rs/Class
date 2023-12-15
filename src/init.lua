@@ -1,3 +1,6 @@
+--// Services
+local TestService = game:GetService("TestService")
+
 --// Variables
 local class = {}
 local empty = {}
@@ -5,6 +8,7 @@ local void = (function(...) return end)
 
 local exceptions = {
     MODIFIED_READ_ONLY = "Unable to assign property %s. Property is read only.";
+    TRY_TO_SET_SAME_INDEX_IN_SETTER = "Tried to change the same index in the setter function. That operation has been ignored to avoid stack overflow.";
 }
 
 local coreConstructorProperties = {
@@ -34,6 +38,7 @@ export type property = {
 
 type constructor = {
     new: () -> object;
+    super: (self: constructor, argumentsOverride: createArguments) -> constructor;
 }
 
 type object = {
@@ -54,29 +59,60 @@ local function createSignal(object, property: string)
     return metatable.__propertyEvents[property].Event
 end
 
+local function traceback(level: number?)
+    local level = (level or 1) + 1
+    local line = debug.info(level, "l") :: number
+    local src = debug.info(level, "s") :: string
+    local source: LuaSourceContainer?
+
+    if src then
+        local lastInstance = game
+        for _, name in ipairs(src:split(".")) do
+            if lastInstance then
+                lastInstance = lastInstance:FindFirstChild(name)
+            else
+                break
+            end
+        end
+
+        source = lastInstance
+    end
+
+    return {
+        line = line;
+        src = src;
+        source = source;
+    }
+end
+
 local function __index(object, key)
     local metatable = getmetatable(object)
     local constructor = metatable.__constructor
     local valueToReturn = rawget(metatable.__self, key)
     local isMethod = false
     
-    if not valueToReturn then
+    if valueToReturn == nil then
         valueToReturn = (rawget(constructor.__properties, key) or empty).value
+
+        if typeof(valueToReturn) == "table" then
+            valueToReturn = table.clone(valueToReturn)
+            rawset(metatable.__self, key, valueToReturn)
+        end
     end
 
-    if not valueToReturn and not rawget(coreConstructorProperties, key) and rawget(constructor, key) and typeof(rawget(constructor, key)) == "function" then
+    if valueToReturn == nil and not rawget(coreConstructorProperties, key) and rawget(constructor, key) and typeof(rawget(constructor, key)) == "function" then
         isMethod = true
         valueToReturn = rawget(constructor, key)
     end
 
-    if not isMethod and not getfenv(2).__rawReturn and valueToReturn and rawget(constructor.__getters, key) then
+    if not isMethod and not getfenv(2)[`__raw{key}Return`] and valueToReturn ~= nil and rawget(constructor.__getters, key) then
         local getter = rawget(constructor.__getters, key)
-        local env = setmetatable({__rawReturn = true}, {__index = getfenv(getter)})
+        local env = setmetatable({[`__raw{key}Return`] = true}, {__index = getfenv(getter)})
 
         valueToReturn = setfenv(getter, env)(object, valueToReturn)
     end
 
-    if not valueToReturn and constructor.__index then
+    if valueToReturn == nil and constructor.__index then
         valueToReturn = constructor.__index(object, key)
     end
 
@@ -133,7 +169,19 @@ local function __newindex(object, key, newValue)
         end
 
         if rawget(constructor.__setters, key) then
-            newValue = rawget(constructor.__setters, key)(object, newValue)
+            if getfenv(2)[`__isIn{key}Setter`] then
+                local StackInfomation = traceback(2)
+
+                warn(exceptions.TRY_TO_SET_SAME_INDEX_IN_SETTER)
+
+                TestService:Message(`{key}'s setter function.`)
+                TestService:Message(`Script '{StackInfomation.src}' Line {StackInfomation.line}`)
+                return
+            else
+                local setter = rawget(constructor.__setters, key)
+                local env = setmetatable({[`__isIn{key}Setter`] = true}, {__index = getfenv(setter)})
+                newValue = setfenv(setter, env)(object, newValue)
+            end
         end
     elseif key == "className" then
         return error(exceptions.MODIFIED_READ_ONLY:format(key), 3)
@@ -144,10 +192,13 @@ local function __newindex(object, key, newValue)
     end
 
     local oldValue = object[key] -- 이거는 메타테이블 일부로 호출 시킨거이빈다 :>
+    local rawOldValue = rawget(metatable.__self, key)
 
     rawset(metatable.__self, key, newValue)
 
-    if newValue ~= oldValue then
+    if newValue ~= rawOldValue then
+        local newValue = object[key] -- getter 통과시키게 일부로 이렇게 호출
+
         metatable.__modified:Fire(key, newValue, oldValue)
 
         if rawget(metatable.__propertyEvents, key) then
@@ -165,15 +216,94 @@ function class.create(arguments: createArguments)
     arguments.metamethods = arguments.metamethods or empty
     arguments.methods = arguments.methods or empty
 
+    for index, value in pairs(arguments.properties) do
+        if typeof(value) ~= "table" then
+            arguments.properties[index] = {
+                value = value
+            }
+        end
+    end
+
     constructor.__properties = arguments.properties
     constructor.__getters = arguments.getters
     constructor.__setters = arguments.setters
     constructor.__createdScript = getfenv(2).script
     constructor.__index = arguments.metamethods.__index
     constructor.__newindex = arguments.metamethods.__newindex
+    constructor.super = class.super
 
     arguments.metamethods.__index = void()
     arguments.metamethods.__newindex = void()
+
+    for method, worker in pairs(arguments.methods) do
+        constructor[method] = worker
+    end
+
+    function constructor.new()
+        local newValue = arguments.makeAsUserdata and newproxy(true) or setmetatable({}, {})
+        local metatable = getmetatable(newValue)
+
+        metatable.__className = arguments.className
+        metatable.__constructor = constructor
+        metatable.__tostring = function() return metatable.__className end
+        metatable.__index = __index
+        metatable.__newindex = __newindex
+        metatable.__modified = Instance.new("BindableEvent")
+        metatable.__propertyEvents = {}
+        metatable.__self = {}
+
+        for metamethod, value in pairs(arguments.metamethods) do
+            metatable[metamethod] = value
+        end
+
+        return newValue
+    end
+
+    return table.freeze(constructor) :: constructor
+end
+
+function class.super(baseConstructor: constructor, argumentsOverride: createArguments)
+    local constructor = {}
+    local arguments = table.clone(argumentsOverride)
+    local properties = table.clone(baseConstructor.__properties)
+    local getters = table.clone(baseConstructor.__getters)
+    local setters = table.clone(baseConstructor.__setters)
+
+    arguments.metamethods = arguments.metamethods or empty
+    arguments.methods = arguments.methods or empty
+
+    for index, value in pairs(arguments.properties) do
+        if typeof(value) ~= "table" then
+            value = {
+                value = value
+            }
+        end
+
+        properties[index] = value
+    end
+
+    for index, value in pairs(arguments.getters or empty) do
+        getters[index] = value
+    end
+
+    for index, value in pairs(arguments.setters or empty) do
+        setters[index] = value
+    end
+    
+    constructor.__properties = properties
+    constructor.__getters = getters
+    constructor.__setters = setters
+    constructor.__createdScript = getfenv(2).script
+    constructor.__index = arguments.metamethods.__index or baseConstructor.__index
+    constructor.__newindex = arguments.metamethods.__newindex or baseConstructor.__newindex
+    constructor.__origin = baseConstructor
+    constructor.super = class.super
+
+    for method, worker in pairs(baseConstructor) do
+        if method ~= "__index" and method ~= "__newindex" and typeof(worker) == "function" then
+            constructor[method] = worker
+        end
+    end
 
     for method, worker in pairs(arguments.methods) do
         constructor[method] = worker
