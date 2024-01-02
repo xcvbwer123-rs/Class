@@ -29,6 +29,7 @@ export type createArguments = {
     setters: {[string]: (self: {[any]: any}, newValue: any) -> any}?;
     metamethods: {[string]: any}?;
     makeAsUserdata: boolean?;
+    init: (object: object) -> ();
 }
 
 export type property = {
@@ -230,6 +231,7 @@ function class.create(arguments: createArguments)
     constructor.__createdScript = getfenv(2).script
     constructor.__index = arguments.metamethods.__index
     constructor.__newindex = arguments.metamethods.__newindex
+    constructor.__init = arguments.init
     constructor.super = class.super
 
     arguments.metamethods.__index = void()
@@ -254,6 +256,10 @@ function class.create(arguments: createArguments)
 
         for metamethod, value in pairs(arguments.metamethods) do
             metatable[metamethod] = value
+        end
+
+        if constructor.__init then
+            constructor.__init(newValue)
         end
 
         return newValue
@@ -296,6 +302,7 @@ function class.super(baseConstructor: constructor, argumentsOverride: createArgu
     constructor.__createdScript = getfenv(2).script
     constructor.__index = arguments.metamethods.__index or baseConstructor.__index
     constructor.__newindex = arguments.metamethods.__newindex or baseConstructor.__newindex
+    constructor.__init = arguments.__init or baseConstructor.__init
     constructor.__origin = baseConstructor
     constructor.super = class.super
 
@@ -324,6 +331,10 @@ function class.super(baseConstructor: constructor, argumentsOverride: createArgu
 
         for metamethod, value in pairs(arguments.metamethods) do
             metatable[metamethod] = value
+        end
+
+        if constructor.__init then
+            constructor.__init(newValue)
         end
 
         return newValue

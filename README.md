@@ -20,6 +20,7 @@ create 안에는 클래스의 정보를 담는 테이블이 들어갑니다.
     setters: *{[속성 이름] = 함수}* 이런 형태로 들어가는 테이블입니다. 함수의 첫 번째 인자로 클래스, 함수의 2번째 인자로 새로 설정될 속성값이 들어옵니다. ***함수는 무조건 값을 반환해야 합니다. (아닐 시 nil값이 저장됨)***
     metamethods: 추가로 씌워질 메타 메서드들이 들어가는 테이블입니다.
     makeAsUserdata: 클래스를 newproxy()로 만들 것인지에 대한 boolean 값입니다.
+	init: 클래스 생성시 실행되는 함수입니다. 인자로 새로 생성된 클래스 오브젝트가 들어옵니다.
 }
 ```
 
@@ -127,6 +128,11 @@ local myClass = class.create({
 	metamethods = {
 		__tostring = function() return "myClass" end;
 	};
+
+	init = function(object)
+		-- 이런식으로 시작할때 값 넣어주거나 할수 있어요
+		object.ASDF = true
+	end;
 })
 
 -- 오브젝트 생성
