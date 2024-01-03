@@ -29,7 +29,7 @@ export type createArguments = {
     setters: {[string]: (self: {[any]: any}, newValue: any) -> any}?;
     metamethods: {[string]: any}?;
     makeAsUserdata: boolean?;
-    init: (object: object) -> ();
+    init: (object: object, ...any) -> ();
 }
 
 export type property = {
@@ -241,7 +241,7 @@ function class.create(arguments: createArguments)
         constructor[method] = worker
     end
 
-    function constructor.new()
+    function constructor.new(...)
         local newValue = arguments.makeAsUserdata and newproxy(true) or setmetatable({}, {})
         local metatable = getmetatable(newValue)
 
@@ -259,7 +259,7 @@ function class.create(arguments: createArguments)
         end
 
         if constructor.__init then
-            constructor.__init(newValue)
+            constructor.__init(newValue, ...)
         end
 
         return newValue
@@ -316,7 +316,7 @@ function class.super(baseConstructor: constructor, argumentsOverride: createArgu
         constructor[method] = worker
     end
 
-    function constructor.new()
+    function constructor.new(...)
         local newValue = arguments.makeAsUserdata and newproxy(true) or setmetatable({}, {})
         local metatable = getmetatable(newValue)
 
@@ -334,7 +334,7 @@ function class.super(baseConstructor: constructor, argumentsOverride: createArgu
         end
 
         if constructor.__init then
-            constructor.__init(newValue)
+            constructor.__init(newValue, ...)
         end
 
         return newValue
