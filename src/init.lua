@@ -29,7 +29,7 @@ export type createArguments = {
     setters: {[string]: (self: {[any]: any}, newValue: any) -> any}?;
     metamethods: {[string]: any}?;
     makeAsUserdata: boolean?;
-    init: (object: object, ...any) -> ();
+    init: ((object: object, ...any) -> ())?;
 }
 
 export type property = {
