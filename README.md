@@ -129,15 +129,19 @@ local myClass = class.create({
 		__tostring = function() return "myClass" end;
 	};
 
-	init = function(object)
+	init = function(object, Argument1)
 		-- 이런식으로 시작할때 값 넣어주거나 할수 있어요
-		object.ASDF = true
+		object.ASDF = Argument1
 	end;
 })
 
 -- 오브젝트 생성
-local myObject = myClass.new()
+local myObject = myClass.new(true)
 local myObject2 = myClass.new()
+
+-- init함수 작동으로 들어간 값 확인
+print(myObject.ASDF)
+print(myObject2.ASDF)
 
 -- 변수 수정
 myObject.Property1 = 20
@@ -230,3 +234,7 @@ print(`Extra Property : {classObject.ExtraProperty}`)
 ```
 
 이런식으로 말이죠!
+
+그리고 만약에 값을 내부에 넣을때 테이블 값이라면 :Destroy()할때 모듈이 그 내부의 값을 같이 날려버릴수도 있어요. 그래서 그런경우에는 내부에 __save값을 true로 해주시면 그 테이블은 초기화를 하지 않아요.
+
+그리고 생성자 스크립트에서 인자값 앞에 __value처럼 __을 붙이면 내부 테이블이 아닌 오브젝트 테이블에 저장되요. (userdata로 생성한경우 메타테이블에 저장되요)
