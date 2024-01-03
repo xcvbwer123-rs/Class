@@ -91,6 +91,15 @@ local function __index(object, key)
     local constructor = metatable.__constructor
     local valueToReturn = rawget(metatable.__self, key)
     local isMethod = false
+    local isCore = #key > 2 and key:sub(1, 2) == "__" and getfenv(2).script == constructor.__createdScript
+
+    if isCore then
+        if typeof(object) == "table" then
+            return rawget(object, key)
+        else
+            return rawget(metatable, key)
+        end
+    end
     
     if valueToReturn == nil then
         valueToReturn = (rawget(constructor.__properties, key) or empty).value
@@ -108,7 +117,7 @@ local function __index(object, key)
 
     if not isMethod and not getfenv(2)[`__raw{key}Return`] and valueToReturn ~= nil and rawget(constructor.__getters, key) then
         local getter = rawget(constructor.__getters, key)
-        local env = setmetatable({[`__raw{key}Return`] = true}, {__index = getfenv(getter)})
+        local env = setmetatable({[`__raw{key}Return`] = true}, {__index = getfenv()})
 
         valueToReturn = setfenv(getter, env)(object, valueToReturn)
     end
@@ -134,12 +143,12 @@ local function __index(object, key)
 
         table.clear(metatable.__propertyEvents)
 
-        for Index, Value in pairs(metatable.__self) do
-            rawset(metatable.__self, Index, nil)
+        for index, value in pairs(metatable.__self) do
+            rawset(metatable.__self, index, nil)
 
-            if typeof(Value) == "table" then
-                setmetatable(Value, nil)
-                table.clear(Value)
+            if typeof(value) == "table" and not value.__save then
+                setmetatable(value, nil)
+                table.clear(value)
             end
         end
 
@@ -163,6 +172,17 @@ local function __newindex(object, key, newValue)
     local metatable = getmetatable(object)
     local constructor = metatable.__constructor
     local propertyInfo = rawget(constructor.__properties, key)
+    local isCore = #key > 2 and key:sub(1, 2) == "__" and getfenv(2).script == constructor.__createdScript
+
+    if isCore then
+        if typeof(object) == "table" then
+            rawset(object, key, newValue)
+        else
+            rawset(metatable, key, newValue)
+        end
+
+        return
+    end
 
     if propertyInfo then
         if rawget(propertyInfo, "isReadOnly") and getfenv(2).script ~= constructor.__createdScript then
@@ -180,7 +200,7 @@ local function __newindex(object, key, newValue)
                 return
             else
                 local setter = rawget(constructor.__setters, key)
-                local env = setmetatable({[`__isIn{key}Setter`] = true}, {__index = getfenv(setter)})
+                local env = setmetatable({[`__isIn{key}Setter`] = true}, {__index = getfenv()})
                 newValue = setfenv(setter, env)(object, newValue)
             end
         end
